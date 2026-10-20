@@ -9,6 +9,8 @@ class HybridRow(dict):
         return super().__getitem__(key)
 
 def hybrid_row_factory(cursor):
+    if cursor.description is None:
+        return lambda row: row
     names = [col.name for col in cursor.description]
     return lambda values: HybridRow(zip(names, values))
 
