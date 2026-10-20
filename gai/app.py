@@ -1,5 +1,31 @@
-"""Grievance AI backend: Flask + SQLite. Secure login, role-based access (per department), audit log, ML prioritisation."""
+"""Grievance AI backend: Flask with SQLite for local use and PostgreSQL for hosted deployments."""
 import os, json, time, secrets, sqlite3
+
+class HybridRow(dict):
+    """Dictionary-style database row that also supports SQLite-style numeric indexes."""
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return list(self.values())[key]
+        return super().__getitem__(key)
+
+def hybrid_row_factory(cursor):
+    names = [col.name for col in cursor.description]
+    return lambda values: HybridRow(zip(names, values))
+
+class PostgresDB:
+    """Small compatibility wrapper for the SQLite-style calls used by this app."""
+    def __init__(self, connection):
+        self.connection = connection
+    def execute(self, sql, params=()):
+        return self.connection.execute(sql.replace("?", "%s"), params)
+    def executescript(self, script):
+        for statement in script.split(";"):
+            if statement.strip():
+                self.connection.execute(statement)
+    def commit(self):
+        self.connection.commit()
+    def close(self):
+        self.connection.close()
 from datetime import datetime, timezone
 from functools import wraps
 from flask import Flask, request, jsonify, session, g, send_from_directory
@@ -14,6 +40,15 @@ CREATE TABLE IF NOT EXISTS emails(id INTEGER PRIMARY KEY AUTOINCREMENT, gid TEXT
   status TEXT DEFAULT 'open', handled_by TEXT, engine TEXT DEFAULT 'local', corrected INTEGER DEFAULT 0, injection INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS lockouts(email TEXT PRIMARY KEY, fails INTEGER, until REAL);
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, user TEXT, action TEXT, email_id INTEGER, detail TEXT, ip TEXT);
+CREATE INDEX IF NOT EXISTS ix_pri ON emails(priority, status);
+"""
+PG_SCHEMA = """
+CREATE TABLE IF NOT EXISTS users(email TEXT PRIMARY KEY, pw_hash TEXT NOT NULL, name TEXT, role TEXT, dept TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS emails(id BIGSERIAL PRIMARY KEY, gid TEXT UNIQUE, sender TEXT, sender_type TEXT, subject TEXT, body TEXT,
+  received_at TEXT, priority TEXT, score INTEGER, category TEXT, dept TEXT, depts TEXT, reasons TEXT, confidence DOUBLE PRECISION, needs_review INTEGER,
+  status TEXT DEFAULT 'open', handled_by TEXT, engine TEXT DEFAULT 'local', corrected INTEGER DEFAULT 0, injection INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS lockouts(email TEXT PRIMARY KEY, fails INTEGER, until DOUBLE PRECISION);
+CREATE TABLE IF NOT EXISTS audit(id BIGSERIAL PRIMARY KEY, ts TEXT, "user" TEXT, action TEXT, email_id INTEGER, detail TEXT, ip TEXT);
 CREATE INDEX IF NOT EXISTS ix_pri ON emails(priority, status);
 """
 DEMO_USERS = [("admin@gov.in", "Admin@123", "Shri A. K. Sharma", "admin", ""),
@@ -31,15 +66,22 @@ def now(): return datetime.now(timezone.utc).isoformat(timespec="seconds")
 def create_app(db_path=None, model_dir=None, seed_demo=None):
     app = Flask(__name__, static_folder=None)
     secret = os.environ.get("GAI_SECRET")
+    database_url = os.environ.get("DATABASE_URL") if db_path is None else None
     app.config.update(SECRET_KEY=secret or secrets.token_hex(32), SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                       SESSION_COOKIE_SECURE=os.environ.get("GAI_HTTPS") == "1", PERMANENT_SESSION_LIFETIME=8 * 3600,
                       DB=db_path or os.environ.get("GAI_DB", os.path.join(ROOT, "data", "gai.db")),
+                      DATABASE_URL=database_url,
                       MODEL_DIR=model_dir or os.environ.get("GAI_MODEL_DIR", os.path.join(ROOT, "models")))
-    os.makedirs(os.path.dirname(app.config["DB"]) or ".", exist_ok=True)
+    if not app.config["DATABASE_URL"]:
+        os.makedirs(os.path.dirname(app.config["DB"]) or ".", exist_ok=True)
 
     def db():
         if "db" not in g:
-            g.db = sqlite3.connect(app.config["DB"]); g.db.row_factory = sqlite3.Row
+            if app.config["DATABASE_URL"]:
+                import psycopg
+                g.db = PostgresDB(psycopg.connect(app.config["DATABASE_URL"], row_factory=hybrid_row_factory))
+            else:
+                g.db = sqlite3.connect(app.config["DB"]); g.db.row_factory = sqlite3.Row
         return g.db
     @app.teardown_appcontext
     def close(_):
@@ -47,7 +89,7 @@ def create_app(db_path=None, model_dir=None, seed_demo=None):
         if d: d.close()
 
     def audit(action, email_id=None, detail="", user=None):
-        db().execute("INSERT INTO audit(ts,user,action,email_id,detail,ip) VALUES(?,?,?,?,?,?)",
+        db().execute('INSERT INTO audit(ts,"user",action,email_id,detail,ip) VALUES(?,?,?,?,?,?)',
                      (now(), user or session.get("email", "-"), action, email_id, detail, request.remote_addr))
         db().commit()
 
@@ -55,21 +97,28 @@ def create_app(db_path=None, model_dir=None, seed_demo=None):
         """Analyse one email and store it. Returns id, or None if already stored (dedupe by Message-ID)."""
         if gid and db().execute("SELECT 1 FROM emails WHERE gid=?", (gid,)).fetchone(): return None
         r = ai.classify(subject, body[:6000], sender_type, app.config["MODEL_DIR"], allow_llm=allow_llm)
-        cur = db().execute("INSERT INTO emails(gid,sender,sender_type,subject,body,received_at,priority,score,category,dept,depts,reasons,confidence,needs_review,engine,injection) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (gid, sender, sender_type, subject, body[:20000], received_at or now(), r["priority"], r["score"], r["category"], r["dept"],
-             json.dumps(r["depts"]), json.dumps(r["reasons"]), r["confidence"], int(r["needs_review"]), r["engine"], int(r["injection"])))
-        db().commit(); return cur.lastrowid
+        sql = "INSERT INTO emails(gid,sender,sender_type,subject,body,received_at,priority,score,category,dept,depts,reasons,confidence,needs_review,engine,injection) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+        params = (gid, sender, sender_type, subject, body[:20000], received_at or now(), r["priority"], r["score"], r["category"], r["dept"],
+                  json.dumps(r["depts"]), json.dumps(r["reasons"]), r["confidence"], int(r["needs_review"]), r["engine"], int(r["injection"]))
+        if app.config["DATABASE_URL"]:
+            new_id = db().execute(sql + " RETURNING id", params).fetchone()["id"]
+        else:
+            new_id = db().execute(sql, params).lastrowid
+        db().commit(); return new_id
     app.ingest = ingest
 
     with app.app_context():
-        db().executescript(SCHEMA)
-        have = {x["name"] for x in db().execute("PRAGMA table_info(emails)")}      # upgrade databases from older versions
+        db().executescript(PG_SCHEMA if app.config["DATABASE_URL"] else SCHEMA)
+        if app.config["DATABASE_URL"]:
+            have = {x["name"] for x in db().execute("SELECT column_name AS name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'emails'")}
+        else:
+            have = {x["name"] for x in db().execute("PRAGMA table_info(emails)")}      # upgrade local databases from older versions
         for c, d in (("engine", "TEXT DEFAULT 'local'"), ("corrected", "INTEGER DEFAULT 0"), ("injection", "INTEGER DEFAULT 0")):
             if c not in have: db().execute("ALTER TABLE emails ADD COLUMN %s %s" % (c, d))
         db().commit()
         if seed_demo or (seed_demo is None and os.environ.get("GAI_SEED_DEMO") == "1"):
             for e, pw, n, role, dept in DEMO_USERS:
-                db().execute("INSERT OR IGNORE INTO users VALUES(?,?,?,?,?)", (e, generate_password_hash(pw), n, role, dept))
+                db().execute("INSERT INTO users VALUES(?,?,?,?,?) ON CONFLICT(email) DO NOTHING", (e, generate_password_hash(pw), n, role, dept))
             db().commit()
             if not db().execute("SELECT 1 FROM emails").fetchone():
                 for s, t, sub, b in DEMO_MAILS: ingest(s, sub, b, sender_type=t, gid="demo-" + sub, allow_llm=False)
@@ -109,7 +158,7 @@ def create_app(db_path=None, model_dir=None, seed_demo=None):
         if until > time.time(): return jsonify(error="Too many failed attempts. Try again in a few minutes."), 429
         u = db().execute("SELECT * FROM users WHERE email=?", (e,)).fetchone()
         if not u or not check_password_hash(u["pw_hash"], str(j.get("password", ""))):
-            c += 1; db().execute("INSERT OR REPLACE INTO lockouts VALUES(?,?,?)", (e, c, time.time() + 300 if c >= 5 else 0)); db().commit()
+            c += 1; db().execute("INSERT INTO lockouts VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET fails=excluded.fails, until=excluded.until", (e, c, time.time() + 300 if c >= 5 else 0)); db().commit()
             audit("login_failed", detail=e, user=e); return jsonify(error="Wrong email or password."), 401
         db().execute("DELETE FROM lockouts WHERE email=?", (e,)); db().commit(); session.clear(); session.permanent = True
         session.update(email=u["email"], role=u["role"], dept=u["dept"], name=u["name"])
