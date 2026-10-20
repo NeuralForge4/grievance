@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Grievance AI prioritises citizen emails for government officials.">
+<title>Grievance AI – Public Grievance Email Prioritiser</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f4f6fa;--card:#fff;--tx:#14213d;--mut:#667085;--bd:#e3e8ef;--pri:#1d4ed8;--crit:#dc2626;--high:#ea580c;--med:#ca8a04;--low:#16a34a;--sel:#eef3ff}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f172a;--card:#1e293b;--tx:#e8edf5;--mut:#94a3b8;--bd:#334155;--pri:#60a5fa;--crit:#f87171;--high:#fb923c;--med:#facc15;--low:#4ade80;--sel:#26344d}}
+:root[data-theme="dark"]{--bg:#0f172a;--card:#1e293b;--tx:#e8edf5;--mut:#94a3b8;--bd:#334155;--pri:#60a5fa;--crit:#f87171;--high:#fb923c;--med:#facc15;--low:#4ade80;--sel:#26344d}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px}
+header{background:var(--card);border-bottom:1px solid var(--bd);padding:12px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:18px;margin:0}h1 small{display:block;font-size:11px;font-weight:400;color:var(--mut)}
+.sp{flex:1}
+button,input,select,textarea{font:inherit;color:var(--tx)}
+button{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:7px 12px;cursor:pointer}
+button.p{background:var(--pri);color:#fff;border-color:var(--pri)}
+button:hover{opacity:.85}
+input,select,textarea{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:7px 10px;width:100%}
+main{max-width:1200px;margin:0 auto;padding:14px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px}
+.st{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;cursor:pointer}
+.st b{font-size:22px;display:block}.st span{color:var(--mut);font-size:12px}
+.bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}.bar>*{width:auto;flex:1;min-width:130px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:14px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.list{display:flex;flex-direction:column;gap:8px}
+.mail{background:var(--card);border:1px solid var(--bd);border-left:5px solid var(--bd);border-radius:10px;padding:10px 12px;cursor:pointer}
+.mail.sel{background:var(--sel);border-color:var(--pri)}
+.mail.Critical{border-left-color:var(--crit)}.mail.High{border-left-color:var(--high)}.mail.Medium{border-left-color:var(--med)}.mail.Low{border-left-color:var(--low)}
+.mail.done{opacity:.5}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.sub{font-weight:600;margin:3px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mut{color:var(--mut);font-size:12px}
+.tag{display:inline-block;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:600;border:1px solid currentColor}
+.tag.Critical{color:var(--crit)}.tag.High{color:var(--high)}.tag.Medium{color:var(--med)}.tag.Low{color:var(--low)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;position:sticky;top:8px}
+.body{white-space:pre-wrap;background:var(--bg);border-radius:8px;padding:10px;margin:10px 0;max-height:220px;overflow:auto}
+.meter{height:10px;background:var(--bd);border-radius:9px;overflow:hidden;margin:6px 0}
+.meter i{display:block;height:100%}
+ul{margin:6px 0 10px;padding-left:18px}li{margin:3px 0}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+dialog{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);width:min(560px,94vw)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+label{display:block;margin:8px 0 3px;font-size:12px;color:var(--mut)}
+.empty{text-align:center;color:var(--mut);padding:30px}
+.drow{display:flex;gap:10px;align-items:center;padding:5px 0;cursor:pointer}.drow span{width:190px;flex:none}.stk{flex:1;display:flex;height:12px;background:var(--bd);border-radius:9px;overflow:hidden}.stk i{display:block;height:100%}
+.view{display:none}.view.on{display:block}
+.nav{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--bd)}
+.hero{text-align:center;padding:56px 18px 36px;max-width:820px;margin:0 auto}.hero h2{font-size:clamp(26px,5vw,40px);margin:0 0 12px;line-height:1.15}.hero p{color:var(--mut);font-size:16px}
+.sec{max-width:1000px;margin:0 auto;padding:22px 18px}.sec h3{font-size:22px;text-align:center;margin:0 0 14px}
+.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.box{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}.box .ic{font-size:28px}.box p{color:var(--mut);margin:6px 0 0}
+.lg{max-width:400px;margin:40px auto;padding:0 14px}
+.demo{font-size:12px;background:var(--bg);border-radius:8px;padding:8px;margin-top:12px}.demo a{color:var(--pri);cursor:pointer;display:block;margin:3px 0}
+.err{color:var(--crit);font-size:12px;min-height:16px;margin-top:6px}
+button.big{padding:11px 20px;font-size:15px}
+footer{text-align:center;color:var(--mut);font-size:12px;padding:24px}
+
+:root{--navy:#12355b;--saf:#e8820c;--grn:#138808;--pri:#12355b}
+body{font-size:calc(14px*var(--fs,1))}
+.site{font-size:calc(16px*var(--fs,1));line-height:1.55}
+html.hc{--bg:#000;--card:#000;--tx:#fff;--mut:#e5e5e5;--bd:#fff;--pri:#ffea00;--sel:#222}
+:focus-visible{outline:3px solid var(--saf);outline-offset:2px}
+.skip{position:absolute;left:-999px}.skip:focus{left:8px;top:8px;background:#fff;color:#000;padding:6px 10px;z-index:99}
+.tri{height:6px;background:linear-gradient(90deg,#e8820c 33.3%,#fff 33.3% 66.6%,#138808 66.6%)}
+.util{background:#0b2340;color:#dfe8f3;font-size:12px;padding:5px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.util a,.util button{color:#dfe8f3;background:none;border:1px solid transparent;border-radius:4px;padding:2px 7px;cursor:pointer;text-decoration:none;font-size:12px}
+.util button:hover,.util a:hover{border-color:#dfe8f3}
+.gh{background:var(--card);padding:14px 20px;display:flex;gap:14px;align-items:center;border-bottom:1px solid var(--bd)}
+.logo{width:54px;height:54px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:26px;flex:none;border:3px solid var(--saf)}
+.gh h1,h2,.serif{font-family:Georgia,"Times New Roman",serif}
+.gh h1{font-size:24px}.gh h1 small{font-family:system-ui,sans-serif;font-size:12px}
+.gnav{background:var(--navy);display:flex;flex-wrap:wrap}
+.gnav a{color:#fff;padding:12px 16px;text-decoration:none;font-size:14px}
+.gnav a:hover,.gnav a.on{background:#1d4f86}
+.gnav a.lgn{margin-left:auto;background:var(--saf);color:#1a1000;font-weight:600}
+.tick{display:flex;background:var(--card);border-bottom:1px solid var(--bd);font-size:13px;overflow:hidden}
+.tick b{background:var(--saf);color:#1a1000;padding:7px 12px;flex:none;z-index:1}
+.tick div{white-space:nowrap;padding:7px 0 7px 100%;animation:mq 38s linear infinite}
+@keyframes mq{to{transform:translateX(-100%)}}
+@media(prefers-reduced-motion:reduce){.tick div{animation:none;padding-left:12px;white-space:normal}}
+.wrap{max-width:1100px;margin:0 auto;padding:0 18px}
+.ghero{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:center;padding:40px 0}
+@media(max-width:800px){.ghero{grid-template-columns:1fr}}
+.ghero h2{font-size:clamp(28px,4.4vw,42px);line-height:1.15;margin:12px 0}
+.ghero p{color:var(--mut);max-width:60ch}
+.btn{display:inline-block;padding:11px 20px;border-radius:6px;text-decoration:none;font-weight:600;border:2px solid var(--navy);color:var(--navy);margin:6px 8px 0 0}
+.btn.p{background:var(--navy);color:#fff}
+html.hc .btn{border-color:#ffea00;color:#ffea00}
+.panel{background:var(--card);border:1px solid var(--bd);border-top:4px solid var(--saf);border-radius:6px;padding:14px}
+.panel .it{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd);font-size:.9em}
+.panel .it:last-child{border:0}
+section.gs{padding:30px 0;border-top:1px solid var(--bd)}
+section.gs>.wrap>h2{font-size:26px;margin:0 0 6px;border-left:5px solid var(--saf);padding-left:12px}
+.lead{color:var(--mut);margin:0 0 16px 17px}
+.tbl{width:100%;border-collapse:collapse;background:var(--card)}
+.tbl th,.tbl td{border:1px solid var(--bd);padding:9px 12px;text-align:left}.tbl th{background:var(--navy);color:#fff}
+details{background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:10px 14px;margin:8px 0}summary{cursor:pointer;font-weight:600}
+.gf{background:#0b2340;color:#cfdbea;margin-top:30px}
+.gf .wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:20px;padding:26px 18px}
+.gf a{color:#cfdbea;display:block;margin:4px 0;text-decoration:none}.gf a:hover{text-decoration:underline}
+.gf h4{margin:0 0 8px;color:#fff}.gf .bt{border-top:1px solid #2b4a70;text-align:center;font-size:12px;padding:12px;display:block}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;padding:34px 0}
+@media(max-width:800px){.two{grid-template-columns:1fr}}
+.cap{background:var(--bg);border:1px dashed var(--bd);border-radius:6px;padding:8px 12px;display:flex;gap:10px;align-items:center;margin-top:10px}
+.cap b{font-size:18px;letter-spacing:1px}.cap input{width:90px}
+
+.hero3{position:relative;height:290px}.hero3 canvas{width:100%;height:100%;display:block}
+.g3 .box{transition:transform .2s ease,box-shadow .2s;will-change:transform}.g3 .box:hover{box-shadow:0 12px 26px rgba(0,0,0,.2)}
+#v-app .card{position:sticky}
+
+:root:root:root{--bg:rgba(255,255,255,.07);--card:rgba(255,255,255,.11);--tx:#f2f6ff;--mut:#bccadf;--bd:rgba(255,255,255,.24);--pri:#9cc8ff;--crit:#ff7b7b;--high:#ffa65c;--med:#ffd75e;--low:#6df0a5;--sel:rgba(255,255,255,.2)}
+html.hc:root:root:root{--bg:#000;--card:#000;--tx:#fff;--mut:#eee;--bd:#fff;--pri:#ffea00;--sel:#222}
+a{color:#a9d3ff}
+body{background:#0b1d3a;color:var(--tx);min-height:100vh}
+body::before{content:"";position:fixed;inset:0;z-index:-2;background:radial-gradient(60vmax 60vmax at 12% 8%,#2b6cff88,transparent 60%),radial-gradient(50vmax 50vmax at 92% 18%,#ff8a3d66,transparent 60%),radial-gradient(55vmax 55vmax at 70% 98%,#19c37d55,transparent 60%),linear-gradient(160deg,#0b1d3a,#13294f 55%,#1a1f4d)}
+body::after{content:"";position:fixed;z-index:-1;width:46vmax;height:46vmax;left:-12vmax;top:30vh;border-radius:50%;background:radial-gradient(circle,#7a5cff99,transparent 65%);filter:blur(40px);animation:drift 28s ease-in-out infinite alternate;pointer-events:none}
+@keyframes drift{to{transform:translate(70vw,-25vh) scale(1.25)}}
+@media(prefers-reduced-motion:reduce){body::after{animation:none}}
+header,.gh,.util,.gnav,.tick,.gf,.card,.box,.panel,.st,.mail,details,dialog,.demo,.cap,.tbl,.body{background:rgba(255,255,255,.1);-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);border:1px solid rgba(255,255,255,.22);box-shadow:0 8px 32px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.28);color:var(--tx)}
+.mail{border-left-width:5px}.mail:hover{background:rgba(255,255,255,.17)}
+.panel{border-top:3px solid rgba(232,130,12,.95)}
+.tbl th{background:rgba(18,53,91,.55)}.tbl td{background:transparent}
+.logo{background:linear-gradient(135deg,#2f7bff,#6a5cff)}
+dialog::backdrop{background:rgba(5,15,40,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+input,select,textarea{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.28);color:#fff}
+input::placeholder,textarea::placeholder{color:#c3d0e4}option{background:#16305c;color:#fff}
+.meter{background:rgba(255,255,255,.18)}
+button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+button.p,.btn.p{background:linear-gradient(135deg,#2f7bff,#6a5cff);border-color:transparent;color:#fff}
+.btn{color:#fff;border-color:rgba(255,255,255,.55);background:rgba(255,255,255,.08)}
+html.hc .btn{color:#ffea00;border-color:#ffea00}
+.gnav a.lgn{background:var(--saf);color:#1a1000}
+.gnav a:hover,.gnav a.on{background:rgba(255,255,255,.18)}
+
+#v-app .card{position:sticky}.empty{text-align:center;color:var(--mut);padding:26px}
+</style>
+<script>(function(){var r=document.documentElement,s=1;try{s=+localStorage.getItem("gai_fs")||1;if(localStorage.getItem("gai_hc")==="1")r.classList.add("hc")}catch(e){}function ap(){r.style.setProperty("--fs",s);try{localStorage.setItem("gai_fs",s)}catch(e){}}window.fsz=function(d){s=d===0?1:Math.min(1.4,Math.max(.85,s+d));ap()};window.hc=function(){r.classList.toggle("hc");try{localStorage.setItem("gai_hc",r.classList.contains("hc")?"1":"0")}catch(e){}};ap()})();</script>
+</head><body>
+<div id="v-home" class="view on site"><a class="skip" href="#main">Skip to main content</a>
+<div class="tri"></div>
+<div class="util"><span><b>भारत सरकार</b> | Government of India (demo portal)</span><span style="flex:1"></span><a href="#main">Skip to content</a><span>Text size:</span><button onclick="fsz(-.1)" aria-label="Decrease text size">A-</button><button onclick="fsz(0)" aria-label="Normal text size">A</button><button onclick="fsz(.1)" aria-label="Increase text size">A+</button><button onclick="hc()" aria-label="Toggle high contrast">◐ High contrast</button></div>
+<header class="gh" role="banner"><div class="logo" aria-hidden="true">🏛️</div><h1>Grievance AI<br><small>Intelligent email prioritisation for public grievance redressal</small></h1></header>
+<nav class="gnav" aria-label="Main navigation"><a href="#home" class="on">Home</a><a href="#about">About</a><a href="#how">How it works</a><a href="#levels">Priority levels</a><a href="#faq">FAQ</a><a href="#contact">Contact</a><a class="lgn" href="#login">Official Login</a></nav>
+<div class="tick" role="region" aria-label="Notices"><b>Notices</b><div>Critical grievances are flagged for response within 1 hour &nbsp;•&nbsp; Officials: log in to view your department inbox &nbsp;•&nbsp; Emails in English and Hindi are supported &nbsp;•&nbsp; Spam and promotional mail is filtered automatically</div></div>
+<main id="main">
+<div class="wrap ghero"><div><span class="tag High">Public grievance redressal</span>
+<h2>Every citizen email is read. The urgent ones are answered first.</h2>
+<p>Officials receive far more email than anyone can read. A flood alert, a court notice and a thank-you note look the same in an inbox. Grievance AI reads each message, scores its urgency, and puts the most serious cases at the top of your dashboard.</p>
+<a class="btn p" href="#login">Official login</a><a class="btn" href="#how">See how it works</a></div>
+<div><div class="hero3"><canvas id="hero3d" role="img" aria-label="3D animation: emails sorting themselves by priority"></canvas></div><div class="panel" aria-label="Sample sorted inbox" style="margin-top:8px"><b>Sample inbox, sorted by Grievance AI</b>
+<div class="it"><span>Flood water entering homes, Sector 7</span><span class="tag Critical">Critical · 94</span></div><div class="it"><span>Oxygen supply low at district hospital</span><span class="tag Critical">Critical · 91</span></div><div class="it"><span>Court contempt notice, hearing in 3 days</span><span class="tag High">High · 78</span></div><div class="it"><span>Widow pension unpaid for 5 months</span><span class="tag High">High · 66</span></div><div class="it"><span>Pothole on Station Road</span><span class="tag Medium">Medium · 38</span></div><div class="it"><span>Suggestion: more benches in city park</span><span class="tag Low">Low · 8</span></div></div></div></div>
+<section class="gs" id="about"><div class="wrap"><h2>The problem</h2><p class="lead">Important emails get lost in volume.</p>
+<div class="g3"><div class="box"><div class="ic">📬</div><b>Too many emails</b><p>Officials cannot read every message, so serious ones get buried.</p></div>
+<div class="box"><div class="ic">⏳</div><b>Delayed response</b><p>Emergencies, pension delays and legal notices wait behind routine mail.</p></div>
+<div class="box"><div class="ic">🙁</div><b>Citizens left waiting</b><p>People write again and again, and lose trust when nobody replies.</p></div></div></div></section>
+<section class="gs" id="how"><div class="wrap"><h2>How it works</h2><p class="lead">Three steps, with a reason shown for every decision.</p>
+<ol><li><b>Collect:</b> emails arrive from the department mailbox automatically.</li>
+<li><b>Understand:</b> an AI model and a trained local model read each email in English or Hindi, and a safety rule keeps life-risk cases from ranking too low.</li>
+<li><b>Prioritise and route:</b> each email gets a level, a reason, a department and a response time. Uncertain ones go to the review queue.</li>
+<li><b>Act:</b> the officer resolves, escalates or corrects the priority, and every action is logged.</li></ol></div></section>
+<section class="gs" id="levels"><div class="wrap"><h2>Priority levels</h2><p class="lead">Each level has a target response time.</p>
+<div style="overflow-x:auto"><table class="tbl"><tr><th>Level</th><th>Score</th><th>Typical cases</th><th>Target response</th></tr>
+<tr><td><span class="tag Critical">Critical</span></td><td>75–100</td><td>Floods, fires, medical emergencies, court deadlines</td><td>Within 1 hour</td></tr>
+<tr><td><span class="tag High">High</span></td><td>50–74</td><td>Corruption complaints, unpaid pensions, long water or power cuts</td><td>Within 24 hours</td></tr>
+<tr><td><span class="tag Medium">Medium</span></td><td>30–49</td><td>Roads, schools, garbage, general service issues</td><td>Within 3 days</td></tr>
+<tr><td><span class="tag Low">Low</span></td><td>0–29</td><td>Suggestions, thanks, invitations, spam</td><td>Within 7–10 days</td></tr></table></div></div></section>
+<section class="gs"><div class="wrap"><h2>What officials get</h2><p class="lead">Built so a person always stays in charge.</p>
+<div class="g3"><div class="box">🧠 <b>Understands meaning</b><p>A language model reads English and Hindi, so a calm email about a dying patient still ranks Critical.</p></div>
+<div class="box">🙋 <b>Human review queue</b><p>Unsure or conflicting cases are flagged for an officer instead of guessed.</p></div>
+<div class="box">🛡️ <b>Privacy first</b><p>Phone numbers, emails and ID numbers are masked before AI processing.</p></div>
+<div class="box">🏢 <b>Department inboxes</b><p>Each officer sees only their own department, enforced on the server.</p></div>
+<div class="box">📜 <b>Full audit trail</b><p>Every view, change and login is recorded.</p></div>
+<div class="box">📈 <b>Learns from officers</b><p>Corrections become training data for the next model version.</p></div></div></div></section>
+<section class="gs" id="faq"><div class="wrap"><h2>Frequently asked questions</h2><p class="lead"> </p>
+<details><summary>Who can log in?</summary><p>Only registered government officials. Citizens continue to write to the usual official email address.</p></details>
+<details><summary>Does the AI make the final decision?</summary><p>No. It ranks emails and explains why. The officer can change any priority, escalate or resolve.</p></details>
+<details><summary>Can it read Hindi emails?</summary><p>Yes. The prototype recognises common Hindi urgency and category words.</p></details>
+<details><summary>Is this connected to a real inbox?</summary><p>Yes. A collector reads the department mailbox over IMAP and stores each email in the database.</p></details></div></section>
+<section class="gs" id="contact"><div class="wrap"><h2>Contact</h2><p class="lead">Help desk for officials (sample details).</p>
+<p style="margin-left:17px">Helpline: 1800-000-0000 · Email: support@grievance-ai.example · Mon–Fri, 9:30 am – 6:00 pm</p></div></section>
+</main><footer class="gf" role="contentinfo"><div class="wrap"><div><h4>About</h4><a href="#about">About Grievance AI</a><a href="#how">How it works</a><a href="#levels">Priority levels</a></div><div><h4>Quick links</h4><a href="#login">Official login</a><a href="#faq">FAQ</a><a href="#contact">Contact us</a></div><div><h4>Policies</h4><a href="#">Terms of use</a><a href="#">Privacy policy</a><a href="#">Accessibility statement</a><a href="#">Sitemap</a></div><div><h4>Help desk</h4>Helpline: 1800-000-0000 (sample)<br>Email: support@grievance-ai.example<br>Mon–Fri, 9:30 am – 6:00 pm</div></div><span class="bt">Prototype built for demonstration; not an official government portal. · Last updated: 15 October 2026 · Best viewed in the latest Chrome, Edge or Firefox.</span></footer></div>
+<div id="v-login" class="view site"><a class="skip" href="#main">Skip to main content</a>
+<div class="tri"></div>
+<div class="util"><span><b>भारत सरकार</b> | Government of India (demo portal)</span><span style="flex:1"></span><a href="#main">Skip to content</a><span>Text size:</span><button onclick="fsz(-.1)" aria-label="Decrease text size">A-</button><button onclick="fsz(0)" aria-label="Normal text size">A</button><button onclick="fsz(.1)" aria-label="Increase text size">A+</button><button onclick="hc()" aria-label="Toggle high contrast">◐ High contrast</button></div>
+<header class="gh" role="banner"><div class="logo" aria-hidden="true">🏛️</div><h1>Grievance AI<br><small>Intelligent email prioritisation for public grievance redressal</small></h1></header>
+<nav class="gnav" aria-label="Main navigation"><a href="#home">Home</a><a href="#about">About</a><a href="#how">How it works</a><a href="#levels">Priority levels</a><a href="#faq">FAQ</a><a href="#contact">Contact</a><a class="lgn" href="#login">Official Login</a></nav>
+<div class="tick" role="region" aria-label="Notices"><b>Notices</b><div>Critical grievances are flagged for response within 1 hour &nbsp;•&nbsp; Officials: log in to view your department inbox &nbsp;•&nbsp; Emails in English and Hindi are supported &nbsp;•&nbsp; Spam and promotional mail is filtered automatically</div></div>
+<main id="main"><div class="wrap two">
+<div><h2 style="font-size:28px;margin:0 0 10px">Official login</h2><p>Sign in to see your prioritised emails, sorted from most to least urgent.</p>
+<ul><li>Use your official email ID.</li><li>Do not share your password.</li><li>Your session ends when you close the browser or log out.</li></ul>
+<div class="panel" id="demo" hidden><b>Demo accounts</b> (click to fill)<br>
+<a href="#" onclick="fill('admin@gov.in','Admin@123');return false">admin@gov.in</a>: District Collector, all departments<br>
+<a href="#" onclick="fill('health@gov.in','Health@123');return false">health@gov.in</a>: Health Department officer<br>
+<a href="#" onclick="fill('pwd@gov.in','Pwd@123');return false">pwd@gov.in</a>: Public Works officer<br>
+<span class="mut">Demo only. A live system needs secure server-side authentication.</span></div></div>
+<div class="panel" style="border-top-color:var(--navy)"><h3 style="margin:0">Sign in</h3>
+<label for="le">Official email ID</label><input id="le" type="email" autocomplete="username" placeholder="name@gov.in">
+<label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password">
+<label style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" style="width:auto" onchange="lp.type=this.checked?'text':'password'"> Show password</label>
+<div class="err" id="lerr" role="alert"></div>
+<button class="btn p" style="width:100%;margin:6px 0 0;cursor:pointer" onclick="login()">Login</button>
+<p style="text-align:center;margin:10px 0 0"><a href="#" onclick="alert('Please contact your department IT administrator to reset your password.');return false">Forgot password?</a></p></div>
+</div></main><footer class="gf" role="contentinfo"><div class="wrap"><div><h4>About</h4><a href="#about">About Grievance AI</a><a href="#how">How it works</a><a href="#levels">Priority levels</a></div><div><h4>Quick links</h4><a href="#login">Official login</a><a href="#faq">FAQ</a><a href="#contact">Contact us</a></div><div><h4>Policies</h4><a href="#">Terms of use</a><a href="#">Privacy policy</a><a href="#">Accessibility statement</a><a href="#">Sitemap</a></div><div><h4>Help desk</h4>Helpline: 1800-000-0000 (sample)<br>Email: support@grievance-ai.example<br>Mon–Fri, 9:30 am – 6:00 pm</div></div><span class="bt">Prototype built for demonstration; not an official government portal. · Last updated: 15 October 2026 · Best viewed in the latest Chrome, Edge or Firefox.</span></footer></div>
+<div id="v-app" class="view"><div class="tri"></div>
+<header><div style="font-size:26px">🏛️</div><h1>Grievance AI<small id="eng">Officer dashboard</small></h1><div class="sp"></div><span class="mut" id="who"></span>
+<button onclick="location.hash='home'">Home</button><button onclick="newMail()">＋ Analyze email</button><button id="bAud" onclick="audit()">Audit log</button><button onclick="metrics()">Model accuracy</button><button onclick="logout()">Logout</button></header>
+<main><div id="inbox"><div class="stats" id="stats"></div>
+<div class="bar"><input id="q" placeholder="🔍 Search…" oninput="load()"><select id="fp" onchange="load()"><option value="">All priorities</option><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select>
+<select id="fs" onchange="load()"><option value="">All statuses</option><option>open</option><option>escalated</option><option>resolved</option></select>
+<select id="fr" onchange="load()"><option value="">All emails</option><option value="1">Needs human review</option></select></div>
+<div class="grid"><div class="list" id="list"></div><div><div class="card" id="detail"></div></div></div></div>
+<div id="pane" class="card" style="position:static" hidden></div></main></div>
+<script src="/static/vendor/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let me=null,rows=[],sel=null,timer=null;
+async function api(p,body){const o={credentials:"same-origin",headers:{"Content-Type":"application/json","X-GAI":"1"}};
+ if(body!==undefined){o.method="POST";o.body=JSON.stringify(body)}
+ const r=await fetch("/api/"+p,o),j=await r.json().catch(()=>({}));
+ if(r.status===401&&me&&p!=="login"){me=null;location.hash="login"}
+ if(!r.ok)throw new Error(j.error||"Error "+r.status);return j}
+function view(v){["v-home","v-login","v-app"].forEach(x=>$(x).classList.toggle("on",x==="v-"+v))}
+async function login(){try{me=await api("login",{email:$("le").value.trim(),password:$("lp").value});$("lp").value="";$("lerr").textContent="";location.hash==="#app"?route():location.hash="app"}catch(e){$("lerr").textContent=e.message}}
+async function logout(){try{await api("logout",{})}catch(e){}me=null;clearInterval(timer);sel=null;location.hash==="#home"?route():location.hash="home"}
+function fill(e,p){$("le").value=e;$("lp").value=p}
+function route(){const h=location.hash.slice(1);if(h==="main")return;
+ if(h==="app"&&me){view("app");$("who").textContent=me.name+(me.dept?" · "+me.dept:" · All departments");$("bAud").hidden=me.role!=="admin";show("inbox");load();clearInterval(timer);timer=setInterval(()=>$("inbox").hidden||load(),30000);scrollTo(0,0);return}
+ if(h==="login"||h==="app"){view("login");scrollTo(0,0);return}
+ view("home");const el=h&&document.getElementById(h);el?el.scrollIntoView():scrollTo(0,0)}
+addEventListener("hashchange",route);
+document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest('a[href="#"]');if(a)e.preventDefault()});
+function show(v){$("inbox").hidden=v!=="inbox";$("pane").hidden=v==="inbox"}
+async function load(){const q=new URLSearchParams({q:$("q").value,priority:$("fp").value,status:$("fs").value,review:$("fr").value});
+ rows=await api("emails?"+q);const s=await api("stats");$("eng").textContent=s.llm?"Officer dashboard · Claude AI + local model":"Officer dashboard · local model";
+ const t=[["Critical","Critical"],["High","High"],["Medium","Medium"],["Low","Low"]].map(([p,l])=>`<div class="st" onclick="$('fp').value='${p}';load()" style="border-top:3px solid var(--${p==="Critical"?"crit":p==="Medium"?"med":p.toLowerCase()})"><b>${s.open_by_priority[p]||0}</b><span>${l} open</span></div>`);
+ t.push(`<div class="st" onclick="$('fr').value='1';load()"><b>${s.needs_review}</b><span>Need review</span></div>`);$("stats").innerHTML=t.join("");
+ $("list").innerHTML=rows.length?rows.map(m=>`<div class="mail ${m.priority} ${m.status==="resolved"?"done":""} ${m.id===sel?"sel":""}" onclick="pick(${m.id})"><div class="row"><span class="mut">${esc(m.sender.split("<")[0])}</span><span class="tag ${m.priority}">${m.priority} · ${m.score}</span></div><div class="sub">${m.status==="escalated"?"⬆ ":""}${m.needs_review?"❓ ":""}${esc(m.subject)}</div><div class="row"><span class="mut">${esc(m.category)}</span><span class="mut">${esc(m.dept)}</span></div></div>`).join(""):'<div class="empty">No emails match your filters.</div>';detail()}
+function pick(id){sel=id;load()}
+function detail(){const m=rows.find(x=>x.id===sel);if(!m){$("detail").innerHTML='<div class="empty">Select an email to see the AI analysis.</div>';return}
+ const c={Critical:"crit",High:"high",Medium:"med",Low:"low"}[m.priority];
+ $("detail").innerHTML=`<div class="row"><b style="font-size:16px">${esc(m.subject)}</b><span class="tag ${m.priority}">${m.priority}</span></div><div class="mut">From ${esc(m.sender)} · ${esc(m.received_at)}</div><div class="body">${esc(m.body)}</div>
+ <b>Priority score ${m.score}/100</b><div class="meter"><i style="width:${m.score}%;background:var(--${c})"></i></div>
+ <div class="mut">Category: <b>${esc(m.category)}</b> · Route to: <b>${esc(m.dept)}</b></div><div class="mut">Decided by: <b>${m.engine==="claude"?"🤖 Claude AI + safety rules":"Local model + safety rules"}</b> · Confidence ${Math.round(m.confidence*100)}%</div>
+ ${m.needs_review?'<div class="panel" style="margin:8px 0">❓ <b>Needs human review.</b> The AI was unsure or the checks disagreed. Please confirm or change the priority.</div>':""}
+ <b style="display:block;margin-top:8px">Why this priority?</b><ul>${m.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>
+ <div class="acts"><button class="p" onclick="act(${m.id},'status','resolved')">✔ Resolve</button><button onclick="act(${m.id},'status','escalated')">⬆ Escalate</button><button onclick="act(${m.id},'status','open')">↺ Reopen</button>
+ ${m.needs_review?`<button class="p" onclick="act(${m.id},'confirm')">✓ Confirm AI priority</button>`:""}
+ <select onchange="this.value&&act(${m.id},'priority',this.value)" style="width:auto"><option value="">Change priority…</option><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></div>`}
+async function act(id,kind,v){try{await api(`emails/${id}/${kind}`,kind==="status"?{status:v}:kind==="priority"?{priority:v}:{});load()}catch(e){alert(e.message)}}
+function newMail(){show("pane");$("pane").innerHTML=`<h3 style="margin-top:0">Analyze a new email</h3><label>From</label><input id="nf"><label>Sender type</label><select id="nt"><option value="citizen">Citizen</option><option value="elected">Elected representative</option><option value="media">Media</option><option value="court">Court / Legal</option><option value="official">Government department</option></select><label>Subject</label><input id="ns"><label>Body</label><textarea id="nb" rows="6"></textarea><div class="err" id="ne"></div><div class="acts"><button class="p" onclick="sendMail()">Analyze &amp; save</button><button onclick="show('inbox')">Cancel</button></div>`}
+async function sendMail(){try{const m=await api("analyze",{sender:$("nf").value,sender_type:$("nt").value,subject:$("ns").value,body:$("nb").value});sel=m.id;show("inbox");load()}catch(e){$("ne").textContent=e.message}}
+async function audit(){show("pane");const a=await api("audit");$("pane").innerHTML=`<h3 style="margin-top:0">Audit log (latest 300)</h3><div style="overflow:auto"><table class="tbl"><tr><th>Time (UTC)</th><th>User</th><th>Action</th><th>Email</th><th>Detail</th></tr>${a.map(r=>`<tr><td>${esc(r.ts)}</td><td>${esc(r.user)}</td><td>${esc(r.action)}</td><td>${esc(r.email_id??"")}</td><td>${esc(r.detail)}</td></tr>`).join("")}</table></div>`}
+async function metrics(){show("pane");const m=await api("metrics"),f=x=>Math.round(x*100)+"%",r=(n,k)=>`<tr><td>${n}</td><td>${f(m[k].accuracy)}</td><td>${f(m[k].macro_f1)}</td><td>${f(m[k].critical_recall)}</td><td>${f(m[k].critical_precision)}</td></tr>`;
+ $("pane").innerHTML=`<h3 style="margin-top:0">Local model accuracy</h3><p class="mut">${esc(m.method)}. ${m.samples} emails${m.real_samples?" (including "+m.real_samples+" officer-verified real emails)":""}. Category accuracy: ${f(m.category_accuracy)}.</p><div style="overflow:auto"><table class="tbl"><tr><th>Method</th><th>Accuracy</th><th>Macro-F1</th><th>Critical recall</th><th>Critical precision</th></tr>${r("Rules only","rules_only")}${r("Local ML model","ml_only")}${r("Local hybrid","hybrid")}</table></div><p class="mut"><b>Important:</b> ${esc(m.caveat)} Measure the Claude-assisted result on your own labelled emails with <code>python -m gai.evaluate your.csv</code>.</p>`}
+(async()=>{try{const p=await (await fetch("/api/public")).json();$("demo").hidden=!p.demo}catch(e){}try{me=await api("me")}catch(e){me=null}route()})();
+/* 3D tilt on cards */
+if(!matchMedia("(prefers-reduced-motion:reduce)").matches)document.querySelectorAll(".g3 .box").forEach(b=>{
+ b.addEventListener("pointermove",e=>{const r=b.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;b.style.transform="perspective(600px) rotateY("+x*10+"deg) rotateX("+-y*10+"deg) translateZ(6px)"});
+ b.addEventListener("pointerleave",()=>b.style.transform="")});
+/* 3D hero: emails sorting by priority */
+(function(){const cv=$("hero3d");if(!cv||!window.THREE){if(cv)cv.parentNode.style.display="none";return}
+ try{const T=THREE,rm=matchMedia("(prefers-reduced-motion:reduce)").matches;
+ const rd=new T.WebGLRenderer({canvas:cv,antialias:true,alpha:true}),sc=new T.Scene(),cam=new T.PerspectiveCamera(38,1,.1,50);cam.position.set(0,0,10.5);
+ sc.add(new T.AmbientLight(0xffffff,.75));const dl=new T.DirectionalLight(0xffffff,.8);dl.position.set(3,4,6);sc.add(dl);
+ const cols=[0xdc2626,0xdc2626,0xea580c,0xea580c,0xca8a04,0xca8a04,0x16a34a,0x16a34a],grp=new T.Group(),items=[];sc.add(grp);
+ const lm=new T.MeshStandardMaterial({color:0x94a3b8});
+ cols.forEach((c,i)=>{const g=new T.Group();
+  g.add(new T.Mesh(new T.BoxGeometry(3.4,.8,.14),new T.MeshStandardMaterial({color:0xffffff,roughness:.5})));
+  const bar=new T.Mesh(new T.BoxGeometry(.2,.8,.16),new T.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.3}));bar.position.x=-1.6;g.add(bar);
+  [[-.2,.12,1.9],[-.2,-.12,1.3]].forEach(l=>{const m=new T.Mesh(new T.BoxGeometry(l[2],.07,.16),lm);m.position.set(l[0],l[1],0);g.add(m)});
+  grp.add(g);items.push({g,rank:i,y:(i%2?1:-1)*i*.3,x:(i%2?1:-1)*1.6})});
+ let sorted=false,last=0,mx=0,my=0,t0=0;
+ addEventListener("pointermove",e=>{mx=e.clientX/innerWidth-.5;my=e.clientY/innerHeight-.5});
+ function order(){const p=items.map((_,i)=>i);if(!sorted)for(let i=p.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[p[i],p[j]]=[p[j],p[i]]}return p}
+ let slots=order();
+ function size(){const w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;rd.setPixelRatio(Math.min(devicePixelRatio||1,2));rd.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+ addEventListener("resize",size);
+ function frame(ts){const t=ts/1000;
+  if(cv.offsetParent!==null){size();
+   if(!rm&&t-last>4.5){last=t;sorted=!sorted;slots=order()}
+   items.forEach((it,i)=>{const s=rm?it.rank:(sorted?it.rank:slots[i]),ty=(3.5-s)*.88,tx=sorted?0:(s%2?1:-1)*.7;
+    it.g.position.y+=(ty-it.g.position.y)*.07;it.g.position.x+=(tx-it.g.position.x)*.07;
+    it.g.rotation.y=Math.sin(t*.8+i)*(sorted?.05:.25);it.g.rotation.x=Math.sin(t*.6+i)*.04;
+    const m=it.g.children[1].material;m.emissiveIntensity=it.rank<2?.3+.25*Math.sin(t*3):.3});
+   grp.rotation.y+=((mx*.9+Math.sin(t*.3)*.25)-grp.rotation.y)*.05;grp.rotation.x+=((my*.4)-grp.rotation.x)*.05;
+   rd.render(sc,cam)}
+  if(!rm||ts<500)requestAnimationFrame(frame)}
+ items.forEach((it,i)=>{it.g.position.y=(3.5-i)*.88});
+ requestAnimationFrame(frame);
+ }catch(e){cv.parentNode.style.display="none"}})();
+
+</script></body></html>

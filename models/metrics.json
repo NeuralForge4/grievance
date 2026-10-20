@@ -1,0 +1,52 @@
+{
+  "method": "5-fold grouped cross-validation by email template (every test email uses a phrasing the model never saw)",
+  "samples": 1500,
+  "templates": 50,
+  "real_samples": 0,
+  "rules_only": {
+    "accuracy": 0.629,
+    "macro_f1": 0.633,
+    "critical_recall": 0.593,
+    "critical_precision": 0.784
+  },
+  "ml_only": {
+    "accuracy": 0.704,
+    "macro_f1": 0.683,
+    "critical_recall": 0.7,
+    "critical_precision": 0.693
+  },
+  "hybrid": {
+    "accuracy": 0.704,
+    "macro_f1": 0.683,
+    "critical_recall": 0.7,
+    "critical_precision": 0.693
+  },
+  "category_accuracy": 0.939,
+  "per_class_hybrid": {
+    "Critical": {
+      "precision": 0.693,
+      "recall": 0.7,
+      "f1-score": 0.697,
+      "support": 300.0
+    },
+    "High": {
+      "precision": 0.777,
+      "recall": 0.772,
+      "f1-score": 0.774,
+      "support": 540.0
+    },
+    "Medium": {
+      "precision": 0.462,
+      "recall": 0.447,
+      "f1-score": 0.454,
+      "support": 300.0
+    },
+    "Low": {
+      "precision": 0.797,
+      "recall": 0.819,
+      "f1-score": 0.808,
+      "support": 360.0
+    }
+  },
+  "caveat": "Measured on SYNTHETIC emails generated from 50 templates. Real-world accuracy must be measured on real, anonymised grievance emails before deployment."
+}
